@@ -82,18 +82,19 @@ public class InMemoryTaskManager implements TaskManager {
         return new SetTaskPushNotificationResponse(request.getId(), params);
     }
 
-    protected PushNotificationConfig setPushNotificationInfo(String taskId, PushNotificationConfig notificationConfig) {
-        Task task = tasks.get(taskId);
-        if (task == null) {
-            throw new IllegalStateException("No task found for " + taskId);
-        }
-        return pushNotificationInfos.put(taskId, notificationConfig);
-    }
-
     @Override
     public GetTaskPushNotificationResponse onGetTaskPushNotification(GetTaskPushNotificationRequest request) {
+        TaskIdParams params = request.getParams();
+        PushNotificationConfig config;
+        try {
+            config = getPushNotificationInfo(params.id());
+        } catch (Exception e) {
+            return new GetTaskPushNotificationResponse(
+                    params.id(),
+                    new InternalError("An error occurred while getting push notification info"));
+        }
 
-        return null;
+        return new GetTaskPushNotificationResponse(params.id(), new TaskPushNotificationConfig(params.id(), config));
     }
 
     @Override
@@ -119,4 +120,22 @@ public class InMemoryTaskManager implements TaskManager {
                 task.metadata());
         return newTask;
     }
+
+    protected PushNotificationConfig setPushNotificationInfo(String taskId, PushNotificationConfig notificationConfig) {
+        Task task = tasks.get(taskId);
+        if (task == null) {
+            throw new IllegalStateException("No task found for " + taskId);
+        }
+        return pushNotificationInfos.put(taskId, notificationConfig);
+    }
+
+    protected PushNotificationConfig getPushNotificationInfo(String taskId) {
+        Task task = tasks.get(taskId);
+        if (task == null) {
+            throw new IllegalStateException("Task not found for " + taskId);
+        }
+        return pushNotificationInfos.get(taskId);
+    }
+
+
 }
