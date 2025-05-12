@@ -11,6 +11,8 @@ import io.a2a.spec.GetTaskPushNotificationRequest;
 import io.a2a.spec.GetTaskPushNotificationResponse;
 import io.a2a.spec.GetTaskRequest;
 import io.a2a.spec.GetTaskResponse;
+import io.a2a.spec.InternalError;
+import io.a2a.spec.JSONRPCResponse;
 import io.a2a.spec.Message;
 import io.a2a.spec.PushNotificationConfig;
 import io.a2a.spec.SendTaskRequest;
@@ -22,6 +24,7 @@ import io.a2a.spec.Task;
 import io.a2a.spec.TaskIdParams;
 import io.a2a.spec.TaskNotCancelableError;
 import io.a2a.spec.TaskNotFoundError;
+import io.a2a.spec.TaskPushNotificationConfig;
 import io.a2a.spec.TaskQueryParams;
 import io.a2a.spec.TaskResubscriptionRequest;
 
@@ -68,11 +71,28 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public SetTaskPushNotificationResponse onSetTaskPushNotification(SetTaskPushNotificationRequest request) {
-        return null;
+        TaskPushNotificationConfig params = request.getParams();
+        try {
+            setPushNotificationInfo(params.id(), params.pushNotificationConfig());
+        } catch (Exception e) {
+            return new SetTaskPushNotificationResponse(
+                    request.getId(),
+                    new InternalError("An error occurred while setting push notification info"));
+        }
+        return new SetTaskPushNotificationResponse(request.getId(), params);
+    }
+
+    protected PushNotificationConfig setPushNotificationInfo(String taskId, PushNotificationConfig notificationConfig) {
+        Task task = tasks.get(taskId);
+        if (task == null) {
+            throw new IllegalStateException("No task found for " + taskId);
+        }
+        return pushNotificationInfos.put(taskId, notificationConfig);
     }
 
     @Override
     public GetTaskPushNotificationResponse onGetTaskPushNotification(GetTaskPushNotificationRequest request) {
+
         return null;
     }
 
