@@ -19,6 +19,8 @@ import io.a2a.spec.SendTaskStreamingRequest;
 import io.a2a.spec.SetTaskPushNotificationRequest;
 import io.a2a.spec.SetTaskPushNotificationResponse;
 import io.a2a.spec.Task;
+import io.a2a.spec.TaskIdParams;
+import io.a2a.spec.TaskNotCancelableError;
 import io.a2a.spec.TaskNotFoundError;
 import io.a2a.spec.TaskQueryParams;
 import io.a2a.spec.TaskResubscriptionRequest;
@@ -36,13 +38,22 @@ public class InMemoryTaskManager implements TaskManager {
             return new GetTaskResponse(request.getId(), new TaskNotFoundError());
         }
 
-        Task result = appendTaskHistory(task, params.historyLength());
-        return new GetTaskResponse(request.getId(), result);
+        synchronized (task) {
+            Task result = appendTaskHistory(task, params.historyLength());
+            return new GetTaskResponse(request.getId(), result);
+        }
     }
 
     @Override
     public CancelTaskResponse onCancelTask(CancelTaskRequest request) {
-        return null;
+        TaskIdParams params = request.getParams();
+        Task task = tasks.get(params.id());
+        if (task == null) {
+            return new CancelTaskResponse(request.getId(), new TaskNotFoundError());
+        }
+
+        return new CancelTaskResponse(request.getId(), new TaskNotCancelableError());
+
     }
 
     @Override
