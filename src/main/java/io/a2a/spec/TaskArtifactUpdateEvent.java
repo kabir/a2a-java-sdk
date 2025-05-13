@@ -12,7 +12,7 @@ import io.a2a.util.Assert;
  */
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record TaskArtifactUpdateEvent(String id, Artifact artifact, Map<String, Object> metadata) {
+public record TaskArtifactUpdateEvent(String id, String sessionId, Artifact artifact, Map<String, Object> metadata) {
 
     public TaskArtifactUpdateEvent {
         Assert.checkNotNullParam("id", id);
