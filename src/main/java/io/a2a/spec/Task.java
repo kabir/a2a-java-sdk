@@ -29,6 +29,19 @@ public record Task(String id, String sessionId, TaskStatus status, List<Artifact
         private List<Message> history;
         private Map<String, Object> metadata;
 
+        public Builder() {
+
+        }
+
+        public Builder(Task task) {
+            id = task.id;
+            sessionId = task.sessionId;
+            status = task.status;
+            artifacts = task.artifacts;
+            history = task.history;
+            metadata = task.metadata;
+        }
+
         public Builder id(String id) {
             this.id = id;
             return this;

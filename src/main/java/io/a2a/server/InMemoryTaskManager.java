@@ -55,6 +55,8 @@ public class InMemoryTaskManager implements TaskManager {
             return new CancelTaskResponse(request.getId(), new TaskNotFoundError());
         }
 
+
+
         return new CancelTaskResponse(request.getId(), new TaskNotCancelableError());
 
     }
@@ -111,13 +113,9 @@ public class InMemoryTaskManager implements TaskManager {
             }
             history = task.history().subList(from, task.history().size());
         }
-        Task newTask = new Task(
-                task.id(),
-                task.sessionId(),
-                task.status(),
-                task.artifacts(),
-                history,
-                task.metadata());
+        Task newTask = new Task.Builder(task)
+                .history(history)
+                .build();
         return newTask;
     }
 
