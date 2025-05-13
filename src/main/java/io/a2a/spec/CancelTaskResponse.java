@@ -23,7 +23,7 @@ public final class CancelTaskResponse extends JSONRPCResponse {
     }
 
 
-    public CancelTaskResponse(Object id, TaskNotCancelableError error) {
-        this(null, id, null, error);
+    public CancelTaskResponse(Object id, Task result) {
+        this(null, id, result, null);
     }
 }

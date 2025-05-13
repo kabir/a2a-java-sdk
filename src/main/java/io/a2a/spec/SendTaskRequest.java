@@ -38,7 +38,7 @@ public final class SendTaskRequest extends JSONRPCRequest<TaskSendParams> {
     public static class Builder {
         private String jsonrpc;
         private Object id;
-        private String method;
+        private String method = "tasks/send";
         private TaskSendParams params;
 
         public Builder jsonrpc(String jsonrpc) {

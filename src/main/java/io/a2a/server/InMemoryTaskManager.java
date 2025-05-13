@@ -1,9 +1,14 @@
 package io.a2a.server;
 
+import static io.a2a.spec.TaskState.CANCELED;
+import static io.a2a.spec.TaskState.SUBMITTED;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 
 import io.a2a.spec.CancelTaskRequest;
 import io.a2a.spec.CancelTaskResponse;
@@ -12,8 +17,8 @@ import io.a2a.spec.GetTaskPushNotificationResponse;
 import io.a2a.spec.GetTaskRequest;
 import io.a2a.spec.GetTaskResponse;
 import io.a2a.spec.InternalError;
-import io.a2a.spec.JSONRPCResponse;
 import io.a2a.spec.Message;
+import io.a2a.spec.Part;
 import io.a2a.spec.PushNotificationConfig;
 import io.a2a.spec.SendTaskRequest;
 import io.a2a.spec.SendTaskResponse;
@@ -27,9 +32,13 @@ import io.a2a.spec.TaskNotFoundError;
 import io.a2a.spec.TaskPushNotificationConfig;
 import io.a2a.spec.TaskQueryParams;
 import io.a2a.spec.TaskResubscriptionRequest;
+import io.a2a.spec.TaskSendParams;
+import io.a2a.spec.TaskState;
+import io.a2a.spec.TaskStatus;
+import io.a2a.spec.TextPart;
 
 public class InMemoryTaskManager implements TaskManager {
-    private final Map<String, Task> tasks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Task> tasks = new ConcurrentHashMap<>();
     private final Map<String, PushNotificationConfig> pushNotificationInfos = new ConcurrentHashMap<>();
 
     @Override
@@ -55,15 +64,40 @@ public class InMemoryTaskManager implements TaskManager {
             return new CancelTaskResponse(request.getId(), new TaskNotFoundError());
         }
 
+        Task cancelled = updateTask(task, t -> new Task.Builder(t)
+                .status(new TaskStatus(CANCELED))
+                .build());
 
-
-        return new CancelTaskResponse(request.getId(), new TaskNotCancelableError());
-
+        return new CancelTaskResponse(request.getId(), cancelled);
     }
 
     @Override
     public SendTaskResponse onSendTask(SendTaskRequest request) {
-        return null;
+        Object taskId = request.getId();
+        Task task = tasks.get(taskId);
+
+        if (task == null) {
+            task = new Task.Builder()
+                    .id(taskId.toString())
+                    .sessionId(request.getParams().sessionId())
+                    .history(List.of(request.getParams().message()))
+                    .status(new TaskStatus(SUBMITTED))
+                    .build();
+            tasks.put(taskId.toString(), task);
+        } else {
+            Task finalTask = task;
+            task = updateTask(task, t -> {
+                List<Message> newHistory = finalTask.history() == null ? new ArrayList<>() : new ArrayList<>(finalTask.history());
+                newHistory.add(request.getParams().message());
+                return new Task.Builder(finalTask)
+                        .history(newHistory)
+                        .build();
+            });
+        }
+
+        performTask(taskId, task, request.getParams());
+
+        return new SendTaskResponse(taskId, task);
     }
 
     @Override
@@ -106,7 +140,10 @@ public class InMemoryTaskManager implements TaskManager {
 
     protected Task appendTaskHistory(Task task, int historyLength) {
         List<Message> history = new ArrayList<>();
-        if (historyLength > 0) {
+        if (historyLength >= 0 && historyLength >= task.history().size()) {
+            return task;
+        }
+        if (historyLength >= 0) {
             int from = task.history().size() - 1 - historyLength;
             if (from < 0) {
                 from = 0;
@@ -135,5 +172,25 @@ public class InMemoryTaskManager implements TaskManager {
         return pushNotificationInfos.get(taskId);
     }
 
+    protected Task updateTask(Task original, Function<Task, Task> updater) {
+        while (true) {
+            Task updated = updater.apply(original);
+            Task old = tasks.put(original.id(), updated);
+            if (old == original) {
+                return updated;
+            }
+            original = old;
+        }
+    }
+
+    private Task performTask(Object taskId, Task task, TaskSendParams params) {
+        // TODO
+        return task;
+    }
+
+    void addTask(Task task) {
+        // Hook for tests to add a task
+        tasks.put(task.id(), task);
+    }
 
 }

@@ -17,4 +17,8 @@ public final class SendTaskResponse extends JSONRPCResponse {
                             @JsonProperty("result") Task result, @JsonProperty("error") JSONRPCError error) {
         super(jsonrpc, id, result, error);
     }
+
+    public SendTaskResponse(Object id, Task result) {
+        this(null, id, result, null);
+    }
 }

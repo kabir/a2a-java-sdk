@@ -38,7 +38,7 @@ public final class GetTaskRequest extends JSONRPCRequest<TaskQueryParams> {
     public static class Builder {
         private String jsonrpc;
         private Object id;
-        private String method;
+        private String method = "tasks/get";
         private TaskQueryParams params;
 
         public GetTaskRequest.Builder jsonrpc(String jsonrpc) {

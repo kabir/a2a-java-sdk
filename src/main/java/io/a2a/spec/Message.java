@@ -14,7 +14,7 @@ import io.a2a.util.Assert;
  */
 @JsonInclude(JsonInclude.Include.NON_ABSENT)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record Message(Role role, List<Part> parts, Map<String, Object> metadata) {
+public record Message(Role role, List<Part<?>> parts, Map<String, Object> metadata) {
 
     public Message {
         Assert.checkNotNullParam("parts", parts);
@@ -39,7 +39,7 @@ public record Message(Role role, List<Part> parts, Map<String, Object> metadata)
     public static class Builder {
 
         private Role role;
-        private List<Part> parts;
+        private List<Part<?>> parts;
         private Map<String, Object> metadata;
 
         public Builder role(Role role) {
@@ -47,7 +47,7 @@ public record Message(Role role, List<Part> parts, Map<String, Object> metadata)
             return this;
         }
 
-        public Builder parts(List<Part> parts) {
+        public Builder parts(List<Part<?>> parts) {
             this.parts = parts;
             return this;
         }
