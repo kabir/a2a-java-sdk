@@ -120,13 +120,13 @@ AgentCard agentCard = A2A.getAgentCard("http://localhost:1234");
 
 ### Hello World Example
 
-A complete example of an A2A client communicating with a Python A2A server is available in the [examples/helloworld](src/main/java/io/a2a/examples/helloworld) directory. This example demonstrates:
+A complete example of an A2A client communicating with a Python A2A server is available in the [examples/src/main/java/io/a2a/examples/helloworld/client/](examples/src/main/java/io/a2a/examples/helloworld/client/) directory. This example demonstrates:
 
 - Setting up and using the A2A Java client
 - Sending regular and streaming messages
 - Receiving and processing responses
 
-The example includes detailed instructions on how to run both the Python server and the Java client using JBang. Check out the [example's README](src/main/java/io/a2a/examples/helloworld/README.md) for more information.
+The example includes detailed instructions on how to run both the Python server and the Java client using JBang. Check out the [example's README](examples/src/main/java/io/a2a/examples/helloworld/client/README.md) for more information.
 
 ## Server
 
