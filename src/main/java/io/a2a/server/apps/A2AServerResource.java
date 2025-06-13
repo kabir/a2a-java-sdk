@@ -1,5 +1,8 @@
 package io.a2a.server.apps;
 
+import static io.a2a.spec.A2A.SEND_STREAMING_MESSAGE_METHOD;
+import static io.a2a.spec.A2A.SEND_TASK_RESUBSCRIPTION_METHOD;
+
 import java.util.concurrent.Flow;
 
 import jakarta.enterprise.inject.Instance;
@@ -18,9 +21,9 @@ import jakarta.ws.rs.sse.Sse;
 import jakarta.ws.rs.sse.SseEventSink;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-
 import io.a2a.server.requesthandlers.JSONRPCHandler;
 import io.a2a.spec.AgentCard;
 import io.a2a.spec.CancelTaskRequest;
@@ -46,9 +49,10 @@ import io.a2a.spec.SetTaskPushNotificationConfigRequest;
 import io.a2a.spec.StreamingJSONRPCRequest;
 import io.a2a.spec.TaskResubscriptionRequest;
 import io.a2a.spec.UnsupportedOperationError;
+import io.a2a.util.Utils;
+import io.quarkus.vertx.web.ReactiveRoutes;
 import io.smallrye.mutiny.Multi;
-
-import org.jboss.resteasy.reactive.RestStreamElementType;
+import io.smallrye.mutiny.Uni;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 import org.jboss.resteasy.reactive.server.UnwrapException;
 
@@ -65,30 +69,59 @@ public class A2AServerResource {
     @Inject
     Sse sse;
 
-    /**
-     * Handles incoming POST requests to the main A2A endpoint. Dispatches the
-     * request to the appropriate JSON-RPC handler method and returns the response.
-     *
-     * @param request the JSON-RPC request
-     * @return the JSON-RPC response which may be an error response
-     */
+
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public JSONRPCResponse<?> handleNonStreamingRequests(NonStreamingJSONRPCRequest<?> request) {
-        return processNonStreamingRequest(request);
+    public Uni<Response> handlePostRequest(String requestString) {
+        try {
+            if (requestString.contains("\"" + SEND_STREAMING_MESSAGE_METHOD + "\"") ||
+                    requestString.contains("\"" + SEND_TASK_RESUBSCRIPTION_METHOD + "\"")) {
+                //System.out.println("====> Streaming endpoint");
+                StreamingJSONRPCRequest request = Utils.OBJECT_MAPPER.readValue(requestString, StreamingJSONRPCRequest.class);
+
+                Multi<? extends JSONRPCResponse<?>> responseStream = processStreamingRequest(request);
+
+                Multi<ReactiveRoutes.ServerSentEvent<? extends JSONRPCResponse<?>>> sseStream =
+                        responseStream.map(i -> (ReactiveRoutes.ServerSentEvent<JSONRPCResponse<?>>) () -> i);
+
+                return Uni.createFrom()
+                        .item(Response.ok(sseStream, MediaType.SERVER_SENT_EVENTS).build());
+            } else {
+                //System.out.println("====> Non-streaming endpoint");
+                NonStreamingJSONRPCRequest request = Utils.OBJECT_MAPPER.readValue(requestString, NonStreamingJSONRPCRequest.class);
+
+                JSONRPCResponse<?> jsonrpcResponse = processNonStreamingRequest(request);
+                return Uni.createFrom()
+                        .item(Response.ok(jsonrpcResponse, MediaType.APPLICATION_JSON).build());
+
+            }
+        } catch (JsonProcessingException exception) {
+            Object id = null;
+            JSONRPCError jsonRpcError = null;
+            if (exception.getCause() instanceof JsonParseException) {
+                jsonRpcError = new JSONParseError();
+            } else if (exception instanceof JsonEOFException) {
+                jsonRpcError = new JSONParseError(exception.getMessage());
+            } else if (exception instanceof MethodNotFoundJsonMappingException err) {
+                id = err.getId();
+                jsonRpcError = new MethodNotFoundError();
+            } else if (exception instanceof InvalidParamsJsonMappingException err) {
+                id = err.getId();
+                jsonRpcError = new InvalidParamsError();
+            } else if (exception instanceof IdJsonMappingException err) {
+                id = err.getId();
+                jsonRpcError = new InvalidRequestError();
+            } else {
+                jsonRpcError = new InvalidRequestError();
+            }
+            Response response = Response.ok(new JSONRPCErrorResponse(id, jsonRpcError))
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
+
+            return Uni.createFrom().item(response);
+        }
     }
 
-    /**
-     * Handles incoming POST requests to the main A2A endpoint that involve Server-Sent Events (SSE).
-     * Dispatches the request to the appropriate JSON-RPC handler method and returns the response.
-     */
-    @POST
-    @Consumes(MediaType.APPLICATION_JSON)
-    @RestStreamElementType(MediaType.APPLICATION_JSON)
-    public Multi<? extends JSONRPCResponse<?>> handleStreamingRequests(StreamingJSONRPCRequest<?> request, Sse sse) {
-        return processStreamingRequest(request, sse);
-    }
 
     /**
      * Handles incoming GET requests to the agent card endpoint.
@@ -146,7 +179,7 @@ public class A2AServerResource {
         }
     }
 
-    private Multi<? extends JSONRPCResponse<?>> processStreamingRequest(JSONRPCRequest<?> request, Sse sse) {
+    private Multi<? extends JSONRPCResponse<?>> processStreamingRequest(JSONRPCRequest<?> request) {
         Flow.Publisher<? extends JSONRPCResponse<?>> publisher;
         if (request instanceof SendStreamingMessageRequest) {
             publisher = jsonRpcHandler.onMessageSendStream((SendStreamingMessageRequest) request);
